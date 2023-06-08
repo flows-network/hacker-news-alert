@@ -10,7 +10,7 @@ use std::env;
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("50 * * * *"),
+        String::from("3 * * * *"),
         "chron job scheduled".to_string(),
         callback,
     );
