@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use dotenv::dotenv;
 use http_req::request;
-use openai_flows::{chat, Model, OpenAIFlows};
+// use openai_flows::{chat, OpenAIFlows};
 use schedule_flows::schedule_cron_job;
 use serde_derive::{Deserialize, Serialize};
 use slack_flows::send_message_to_channel;
@@ -10,7 +10,7 @@ use std::env;
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("3 * * * *"),
+        String::from("6 * * * *"),
         "chron job scheduled".to_string(),
         callback,
     );
@@ -23,7 +23,7 @@ fn callback(keyword: Vec<u8>) {
     let workspace = std::env::var("slack_workspace").unwrap();
     let channel = std::env::var("slack_channel").unwrap();
 
-    let query = String::from_utf8(keyword).unwrap();
+    let query = keyword;
 
     let now = SystemTime::now();
     let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 3600;
