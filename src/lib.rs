@@ -11,7 +11,6 @@ use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tiktoken_rs::cl100k_base;
 use tokio;
-use url;
 use web_scraper_flows::get_page_text;
 
 #[no_mangle]
@@ -34,7 +33,7 @@ async fn callback(keyword: Vec<u8>) {
     let url = format!("https://hn.algolia.com/api/v1/search_by_date?tags=story&query={query}&numericFilters=created_at_i>{dura}");
 
     let mut writer = Vec::new();
-    if let Ok(resp) = request::get(url, &mut writer) {
+    if let Ok(_) = request::get(url, &mut writer) {
         if let Ok(search) = serde_json::from_slice::<Search>(&writer) {
             for hit in search.hits {
                 let title = &hit.title;
@@ -50,10 +49,15 @@ async fn callback(keyword: Vec<u8>) {
                 let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n");
                 send_message_to_channel(&workspace, &channel, msg);
 
-                if let Ok(summary) = get_page_text(&source).await {
+                if let Ok(text) = get_page_text(&source).await {
                     let msg =
-                        format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
-                    send_message_to_channel(&workspace, &channel, msg);
+                    format!("- *{title}*\n<{post} | post>{source} by {author}\n{text}");
+                send_message_to_channel(&workspace, &channel, msg);
+
+                     let summary = get_summary(text).await;
+                        let msg =
+                            format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
+                        send_message_to_channel(&workspace, &channel, msg);
                 }
             }
         }
