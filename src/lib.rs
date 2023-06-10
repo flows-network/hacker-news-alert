@@ -16,7 +16,7 @@ use web_scraper_flows::get_page_text;
 #[no_mangle]
 pub fn run() {
     let keyword = std::env::var("KEYWORD").unwrap();
-    schedule_cron_job(String::from("53 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("14 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -46,18 +46,18 @@ async fn callback(keyword: Vec<u8>) {
                     Some(u) => format!("(<{u}|source>)"),
                     None => String::new(),
                 };
-                let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n");
-                send_message_to_channel(&workspace, &channel, msg);
-
-                if let Ok(text) = get_page_text(url.clone().unwrap().as_ref()).await {
-                //     let msg =
-                //     format!("- *{title}*\n<{post} | post>{source} by {author}\n{text}");
+                // let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n");
                 // send_message_to_channel(&workspace, &channel, msg);
 
-                     let summary = get_summary(text).await;
-                        let msg =
-                            format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
-                        send_message_to_channel(&workspace, &channel, msg);
+                if let Ok(text) = get_page_text(url.clone().unwrap().as_ref()).await {
+                    //     let msg =
+                    //     format!("- *{title}*\n<{post} | post>{source} by {author}\n{text}");
+                    // send_message_to_channel(&workspace, &channel, msg);
+
+                    let summary = get_summary(text).await;
+                    let msg =
+                        format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
+                    send_message_to_channel(&workspace, &channel, msg);
                 }
             }
         }
@@ -89,7 +89,7 @@ async fn get_summary(inp: String) -> String {
     let feed_tokens_map = bpe.encode_ordinary(&inp);
 
     let chat_id = format!("news summary N");
-    let system = &format!("You're a news reporter bot");
+    let system = &format!("As a news reporter AI,");
 
     let co = ChatOptions {
         model: ChatModel::GPT35Turbo,
@@ -110,17 +110,20 @@ async fn get_summary(inp: String) -> String {
 
             let text_chunk = bpe.decode(token_chunk).unwrap();
 
-            let map_question = format!("This is segment of news '{text_chunk}'");
+            send_message_to_channel("ik8", "ch_in", text_chunk.clone());
+
+            let map_question = format!("This is a segment of the text from the news page: '{text_chunk}'. It may contain irrelevant information due to ads or the publisher's intention to leverage this news' public attention to promote other agenda. Extract and summarize the key information that may be connected to the news from this segment.");
 
             match openai.chat_completion(&chat_id, &map_question, &co).await {
                 Ok(r) => {
+                    send_message_to_channel("ik8", "ch_out", r.choice.clone());
                     map_out.push_str(&r.choice);
                 }
                 Err(_e) => {}
             }
         }
 
-        let reduce_question = format!("The key information you've extracted from the news' body text: {map_out}. Concentrate on the key arguments, and the conclusion the article is trying to make. From these elements, generate a concise summary that reflects its news-worthyness.");
+        let reduce_question = format!("Given the key information extracted from the news' body text: {map_out}, focus on the core arguments and the conclusions drawn in the article. Create a brief and meaningful summary that captures its relevance and news-worthiness.");
 
         match openai
             .chat_completion(&chat_id, &reduce_question, &co)
@@ -134,7 +137,7 @@ async fn get_summary(inp: String) -> String {
     } else {
         let news_body = bpe.decode(feed_tokens_map).unwrap();
 
-        let question = format!("This is the news body text: {news_body}. Concentrate on the key arguments, and the conclusion the article is trying to make. From these elements, generate a concise summary that reflects its news-worthyness.");
+        let question = format!("Given the news body text: {news_body}, which may include some irrelevant information, identify the key arguments and the article's conclusion. From these important elements, construct a succinct summary that encapsulates its news value, disregarding any unnecessary details.");
 
         match openai.chat_completion(&chat_id, &question, &co).await {
             Ok(r) => {
