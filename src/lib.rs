@@ -17,7 +17,7 @@ use web_scraper_flows::get_page_text;
 #[no_mangle]
 pub fn run() {
     let keyword = std::env::var("KEYWORD").unwrap();
-    schedule_cron_job(String::from("6 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("28 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
