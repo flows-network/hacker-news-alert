@@ -17,7 +17,7 @@ use web_scraper_flows::get_page_text;
 #[no_mangle]
 pub fn run() {
     let keyword = std::env::var("KEYWORD").unwrap();
-    schedule_cron_job(String::from("28 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("33 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -47,6 +47,8 @@ async fn callback(keyword: Vec<u8>) {
                     Some(u) => format!("(<{u}|source>)"),
                     None => String::new(),
                 };
+                let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n");
+                send_message_to_channel(&workspace, &channel, msg);
 
                 if let Ok(summary) = get_page_text(&source).await {
                     let msg =
