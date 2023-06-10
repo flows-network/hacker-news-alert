@@ -1,7 +1,6 @@
 use dotenv::dotenv;
 use http_req::request;
 use openai_flows::{
-    chat,
     chat::{ChatModel, ChatOptions},
     OpenAIFlows,
 };
@@ -10,40 +9,34 @@ use serde_derive::{Deserialize, Serialize};
 use slack_flows::send_message_to_channel;
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tiktoken_rs::cl100k_base;
+use tokio;
 use url;
-use article_scraper::Readability;
+use web_scraper_flows::get_page_text;
+
 #[no_mangle]
 pub fn run() {
-    schedule_cron_job(
-        String::from("6 * * * *"),
-        "chron job scheduled".to_string(),
-        callback,
-    );
+    let keyword = std::env::var("KEYWORD").unwrap();
+    schedule_cron_job(String::from("6 * * * *"), keyword, callback);
 }
 
-fn callback(keyword: Vec<u8>) {
+#[no_mangle]
+#[tokio::main(flavor = "current_thread")]
+async fn callback(keyword: Vec<u8>) {
     dotenv().ok();
 
-    let keyword = std::env::var("KEYWORD").unwrap();
     let workspace = std::env::var("slack_workspace").unwrap();
     let channel = std::env::var("slack_channel").unwrap();
 
-    let query = keyword;
-
+    let query = String::from_utf8(keyword).unwrap();
     let now = SystemTime::now();
     let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 3600;
     let url = format!("https://hn.algolia.com/api/v1/search_by_date?tags=story&query={query}&numericFilters=created_at_i>{dura}");
 
     let mut writer = Vec::new();
-    let resp = request::get(url, &mut writer).unwrap();
-
-    if resp.status_code().is_success() {
-        let search: Search = serde_json::from_slice(&writer).unwrap();
-
-        let hits = search.hits;
-        let list = hits
-            .iter()
-            .map(|hit| {
+    if let Ok(resp) = request::get(url, &mut writer) {
+        if let Ok(search) = serde_json::from_slice::<Search>(&writer) {
+            for hit in search.hits {
                 let title = &hit.title;
                 let url = &hit.url;
                 let object_id = &hit.object_id;
@@ -55,12 +48,13 @@ fn callback(keyword: Vec<u8>) {
                     None => String::new(),
                 };
 
-                format!("- *{title}*\n<{post} | post>{source} by {author}\n")
-            })
-            .collect::<String>();
-
-        let msg = format!(":sparkles: {query} :sparkles:\n{list}");
-        send_message_to_channel(&workspace, &channel, msg);
+                if let Ok(summary) = get_page_text(&source).await {
+                    let msg =
+                        format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
+                    send_message_to_channel(&workspace, &channel, msg);
+                }
+            }
+        }
     }
 }
 
@@ -80,53 +74,16 @@ pub struct Hit {
     pub created_at_i: i64,
 }
 
-async fn get_webpage_text(url: &str) -> Option<String> {
-    let parsed_url = Url::parse(url)?;
-    let scheme = parsed_url.scheme();
-    let host = parsed_url.host_str().unwrap_or("");
-    let base_url = Url::parse(&format!("{}://{}", scheme, host)).unwrap();
-
-    let mut writer = Vec::new(); //container for body of a response
-    let res = request::get(url, &mut writer).unwrap();
-
-    match Readability::extract(&String::from_utf8(writer).unwrap(), Some(base_url)).await {
-        Ok(res) => {
-            let output = from_read(res.to_string().as_bytes(), 80);
-            Some(output)
-        }
-        Err(_err) => None,
-    }
-}
-
-async fn get_summary() {
+async fn get_summary(inp: String) -> String {
     let mut openai = OpenAIFlows::new();
     openai.set_retry_times(3);
 
     let bpe = cl100k_base().unwrap();
 
-    let mut feed_tokens_map = Vec::new();
+    let feed_tokens_map = bpe.encode_ordinary(&inp);
 
-    let issue_creator_input = format!("User '{issue_creator_name}', who holds the role of '{issue_creator_role}', has submitted an issue titled '{issue_title}', labeled as '{labels}', with the following post: '{issue_body}'.");
-
-    let mut tokens = bpe.encode_ordinary(&issue_creator_input);
-    feed_tokens_map.append(&mut tokens);
-
-    match issues_handle.list_comments(issue_number).send().await {
-        Ok(pages) => {
-            for comment in pages.items {
-                let comment_body = comment.body.unwrap_or("".to_string());
-                let commenter = comment.user.login;
-                let commenter_input = format!("{commenter} commented: {comment_body}");
-                let mut tokens = bpe.encode_ordinary(&commenter_input);
-                feed_tokens_map.append(&mut tokens);
-            }
-        }
-
-        Err(_e) => {}
-    }
-
-    let chat_id = format!("Issue#{issue_number}");
-    let system = &format!("As an AI co-owner of a GitHub repository, you are responsible for conducting a comprehensive analysis of GitHub issues. Your analytic focus encompasses distinct elements, including the issue's title, associated labels, body text, the identity of the issue's creator, their role, and the nature of the comments on the issue. Utilizing these data points, your task is to generate a succinct, context-aware summary of the issue.");
+    let chat_id = format!("news summary N");
+    let system = &format!("You're a news reporter bot");
 
     let co = ChatOptions {
         model: ChatModel::GPT35Turbo,
@@ -147,7 +104,7 @@ async fn get_summary() {
 
             let text_chunk = bpe.decode(token_chunk).unwrap();
 
-            let map_question = format!("Given the issue titled '{issue_title}' and a particular segment of body or comment text '{text_chunk}', focus on extracting the central arguments, proposed solutions, and instances of agreement or conflict among the participants. Generate an interim summary capturing the essential information in this section. This will be used later to form a comprehensive summary of the entire discussion.");
+            let map_question = format!("This is segment of news '{text_chunk}'");
 
             match openai.chat_completion(&chat_id, &map_question, &co).await {
                 Ok(r) => {
@@ -157,7 +114,7 @@ async fn get_summary() {
             }
         }
 
-        let reduce_question = format!("User '{issue_creator_name}', in the role of '{issue_creator_role}', has filed an issue titled '{issue_title}', labeled as '{labels}'. The key information you've extracted from the issue's body text and comments in segmented form are: {map_out}. Concentrate on the principal arguments, suggested solutions, and areas of consensus or disagreement among the participants. From these elements, generate a concise summary of the entire issue to inform the next course of action.");
+        let reduce_question = format!("The key information you've extracted from the news' body text: {map_out}. Concentrate on the key arguments, and the conclusion the article is trying to make. From these elements, generate a concise summary that reflects its news-worthyness.");
 
         match openai
             .chat_completion(&chat_id, &reduce_question, &co)
@@ -169,9 +126,9 @@ async fn get_summary() {
             Err(_e) => {}
         }
     } else {
-        let issue_body = bpe.decode(feed_tokens_map).unwrap();
+        let news_body = bpe.decode(feed_tokens_map).unwrap();
 
-        let question = format!("{issue_body}, concentrate on the principal arguments, suggested solutions, and areas of consensus or disagreement among the participants. From these elements, generate a concise summary of the entire issue to inform the next course of action.");
+        let question = format!("This is the news body text: {news_body}. Concentrate on the key arguments, and the conclusion the article is trying to make. From these elements, generate a concise summary that reflects its news-worthyness.");
 
         match openai.chat_completion(&chat_id, &question, &co).await {
             Ok(r) => {
@@ -181,6 +138,5 @@ async fn get_summary() {
         }
     }
 
-    let text = format!("Issue Summary:\n{}\n{}", _summary, issue_url);
-    send_message_to_channel(&slack_workspace, &slack_channel, text);
+    _summary
 }
