@@ -20,7 +20,7 @@ use tiktoken_rs::cl100k_base;
 pub fn run() {
         dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap();
-    schedule_cron_job(String::from("14 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("25 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
