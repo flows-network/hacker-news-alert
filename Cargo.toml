@@ -8,14 +8,15 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-http_req_wasi = {version = "0.10.2", features = [ "wasmedge_ssl"]}
+http_req_wasi = {version = "0.10", features = [ "wasmedge_ssl"]}
 dotenv = "0.15.0"
 openai-flows = "0.7.1"
 schedule-flows = "0.1.10"
 serde = "1.0.156"
 serde_derive = "1.0.156"
 serde_json = "1.0.94"
-slack-flows = "0.2.6"
+slack-flows = "0.3.1"
 tokio_wasi = { version = "1.25.1", features = ["macros", "rt", "sync"] }
 web-scraper-flows = "0.1.0"
-tiktoken-rs = "0.4.2"
+tiktoken-rs = "0.2.2"
+chrono = "0.4.26"
