@@ -13,14 +13,13 @@ use slack_flows::{listen_to_channel, send_message_to_channel};
 use std::env;
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tiktoken_rs::cl100k_base;
 // use web_scraper_flows::get_page_text;
 
 #[no_mangle]
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("44 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("56 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -99,7 +98,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
 
     let news_body = inp
         .split_ascii_whitespace()
-        .take(14000)
+        .take(12000)
         .collect::<Vec<&str>>()
         .join(" ");
 
