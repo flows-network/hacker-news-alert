@@ -19,7 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("17 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("21 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -30,7 +30,7 @@ async fn callback(keyword: Vec<u8>) {
 
     let query = String::from_utf8_lossy(&keyword);
     let now = SystemTime::now();
-    let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 7200;
+    let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 10000;
     let url = format!("https://hn.algolia.com/api/v1/search_by_date?tags=story&query={query}&numericFilters=created_at_i>{dura}");
 
     let mut writer = Vec::new();
