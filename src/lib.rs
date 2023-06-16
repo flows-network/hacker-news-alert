@@ -117,7 +117,6 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
     match openai.chat_completion(&chat_id, &question, &co).await {
         Ok(r) => Ok(r.choice),
         Err(_e) => {
-            send_message_to_channel("ik8", "ch_err", _e.to_string()).await;
             Err(anyhow::Error::msg(_e.to_string()))
         }
     }
