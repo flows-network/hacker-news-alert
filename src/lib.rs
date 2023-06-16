@@ -13,13 +13,13 @@ use slack_flows::{listen_to_channel, send_message_to_channel};
 use std::env;
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
-// use web_scraper_flows::get_page_text;
+use web_scraper_flows::get_page_text;
 
 #[no_mangle]
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("21 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("32 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -47,7 +47,7 @@ async fn callback(keyword: Vec<u8>) {
                 match url {
                     Some(u) => {
                         let source = format!("(<{u}|source>)");
-                        if let Some(text) = obtain_text_by_post(u).await {
+                        if let Ok(text) = get_page_text(u).await {
                             match get_summary_truncated(&text).await {
                                 Ok(summary) => {
                                     let msg = format!(
@@ -56,13 +56,14 @@ async fn callback(keyword: Vec<u8>) {
                                     send_message_to_channel(&workspace, &channel, msg).await;
                                 }
                                 Err(_e) => {
-                                    send_message_to_channel("ik8", "ch_err", _e.to_string()).await
+                                    // Err(anyhow::Error::msg(_e.to_string()))
+                                    // send_message_to_channel("ik8", "ch_err", _e.to_string()).await
                                 }
                             }
                         }
                     }
                     None => {
-                        if let Some(text) = obtain_text_by_post(&post).await {
+                        if let Ok(text) = get_page_text(&post).await {
                             if let Ok(summary) = get_summary_truncated(&text).await {
                                 let msg =
                                     format!("- *{title}*\n<{post} | post> by {author}\n{summary}");
@@ -103,7 +104,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         .join(" ");
 
     let chat_id = format!("news-summary-N");
-    let system = &format!("You're an editor AI.");
+    let system = &format!("You're a news editor AI.");
 
     let co = ChatOptions {
         model: ChatModel::GPT35Turbo16K,
@@ -124,26 +125,6 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
 
 pub async fn obtain_text_by_post(inp: &str) -> Option<String> {
     let server_addr = "43.135.155.64:3000".parse::<SocketAddr>().unwrap();
-    let url = format!("http://{}/api", server_addr);
-    let uri = Uri::try_from(url.as_ref()).unwrap();
-    let body = json!({ "url": inp }).to_string();
-
-    let mut writer = Vec::<u8>::new();
-    if let Ok(_res) = Request::new(&uri)
-        .method(Method::POST)
-        .header("Content-Type", "application/json")
-        .header("Content-Length", &body.len())
-        .body(body.as_bytes())
-        .send(&mut writer)
-    {
-        let text_load = String::from_utf8_lossy(&writer);
-        return Some(text_load.to_string());
-    }
-    None
-}
-
-pub async fn obtain_summary_by_post(inp: &str) -> Option<String> {
-    let server_addr = "43.135.155.64:4000".parse::<SocketAddr>().unwrap();
     let url = format!("http://{}/api", server_addr);
     let uri = Uri::try_from(url.as_ref()).unwrap();
     let body = json!({ "url": inp }).to_string();
