@@ -19,7 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("05 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("11 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -102,7 +102,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         .collect::<Vec<&str>>()
         .join(" ");
 
-    let chat_id = format!("news summary N");
+    let chat_id = format!("news-summary-N");
     let system = &format!("You're an editor AI.");
 
     let co = ChatOptions {
