@@ -19,7 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("56 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("05 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
