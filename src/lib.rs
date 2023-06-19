@@ -48,7 +48,7 @@ async fn callback(keyword: Vec<u8>) {
                     Some(u) => {
                         let source = format!("(<{u}|source>)");
                         if let Ok(text) = get_page_text(u).await {
-                            let text = text.split_whitespace().join(" ");
+                            let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
 
                             match get_summary_truncated(&text).await {
                                 Ok(summary) => {
@@ -66,7 +66,7 @@ async fn callback(keyword: Vec<u8>) {
                     }
                     None => {
                         if let Ok(text) = get_page_text(&post).await {
-                            let text = text.split_whitespace().join(" ");
+                            let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
 
                             if let Ok(summary) = get_summary_truncated(&text).await {
                                 let msg =
