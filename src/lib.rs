@@ -19,7 +19,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("07 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("02 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -116,7 +116,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         system_prompt: Some(system),
     };
 
-    let question = format!("Summarize this: {news_body}.");
+    let question = format!("Make a concise summary within 200 words on this: {news_body}.");
 
     match openai.chat_completion(&chat_id, &question, &co).await {
         Ok(r) => Ok(r.choice),
