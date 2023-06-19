@@ -19,7 +19,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("32 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("03 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -48,6 +48,8 @@ async fn callback(keyword: Vec<u8>) {
                     Some(u) => {
                         let source = format!("(<{u}|source>)");
                         if let Ok(text) = get_page_text(u).await {
+                            let text = text.split_whitespace().join(" ");
+
                             match get_summary_truncated(&text).await {
                                 Ok(summary) => {
                                     let msg = format!(
@@ -64,6 +66,8 @@ async fn callback(keyword: Vec<u8>) {
                     }
                     None => {
                         if let Ok(text) = get_page_text(&post).await {
+                            let text = text.split_whitespace().join(" ");
+
                             if let Ok(summary) = get_summary_truncated(&text).await {
                                 let msg =
                                     format!("- *{title}*\n<{post} | post> by {author}\n{summary}");
@@ -99,7 +103,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
 
     let news_body = inp
         .split_ascii_whitespace()
-        .take(12000)
+        .take(11000)
         .collect::<Vec<&str>>()
         .join(" ");
 
@@ -116,9 +120,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
 
     match openai.chat_completion(&chat_id, &question, &co).await {
         Ok(r) => Ok(r.choice),
-        Err(_e) => {
-            Err(anyhow::Error::msg(_e.to_string()))
-        }
+        Err(_e) => Err(anyhow::Error::msg(_e.to_string())),
     }
 }
 
