@@ -19,7 +19,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("55 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("56 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -128,7 +128,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         Ok(r) => {
             let text = r.choice;
             let head = text.chars().take(150).collect::<String>();
-            send_message_to_channel(&workspace, "ch_err", head).await;
+            send_message_to_channel("ik8", "ch_err", head).await;
 
             let start_index = text.find('{').unwrap();
             let end_index = text.rfind('}').unwrap();
@@ -142,7 +142,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 struct Article {
     summary: String,
     keywords: Vec<String>,
