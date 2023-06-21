@@ -116,30 +116,32 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         system_prompt: Some(system),
     };
 
-    let question = format!("Make a concise summary within 200 words on this: {news_body}.");
-
+    let question = format!(r#"From the provided text: {news_body}, identify the main news article and provide a concise summary of about 100 words on it. Present your response in the following JSON format:
+    ```json
+    {{
+        "summary": "<summary>",
+        "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"],
+        "word_count": "<word_count>"
+    }}
+    ```"#);
     match openai.chat_completion(&chat_id, &question, &co).await {
-        Ok(r) => Ok(r.choice),
+        Ok(r) => {
+            let text = r.choice;
+            let start_index = text.find('{').unwrap();
+            let end_index = text.rfind('}').unwrap();
+            let json_string = &text[start_index..=end_index];
+
+            let article: Article = serde_json::from_str(json_string).unwrap_or(Article::default());
+
+            Ok(article.summary)
+        }
         Err(_e) => Err(anyhow::Error::msg(_e.to_string())),
     }
 }
 
-pub async fn obtain_text_by_post(inp: &str) -> Option<String> {
-    let server_addr = "43.135.155.64:3000".parse::<SocketAddr>().unwrap();
-    let url = format!("http://{}/api", server_addr);
-    let uri = Uri::try_from(url.as_ref()).unwrap();
-    let body = json!({ "url": inp }).to_string();
-
-    let mut writer = Vec::<u8>::new();
-    if let Ok(_res) = Request::new(&uri)
-        .method(Method::POST)
-        .header("Content-Type", "application/json")
-        .header("Content-Length", &body.len())
-        .body(body.as_bytes())
-        .send(&mut writer)
-    {
-        let text_load = String::from_utf8_lossy(&writer);
-        return Some(text_load.to_string());
-    }
-    None
+#[derive(Serialize, Deserialize, Default)]
+struct Article {
+    summary: String,
+    keywords: Vec<String>,
+    word_count: i32,
 }
