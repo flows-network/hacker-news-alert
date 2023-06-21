@@ -26,7 +26,7 @@ pub fn run() {
 #[tokio::main(flavor = "current_thread")]
 async fn callback(keyword: Vec<u8>) {
     let workspace = env::var("slack_workspace").unwrap_or("secondstate".to_string());
-    let channel = env::var("slack_channel").unwrap_or("github-status".to_string());
+    let channel = env::var("slack_channel").unwrap_or("test-flow".to_string());
 
     let query = String::from_utf8_lossy(&keyword);
     let now = SystemTime::now();
