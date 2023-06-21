@@ -19,7 +19,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("13 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("17 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -49,6 +49,8 @@ async fn callback(keyword: Vec<u8>) {
                         let source = format!("(<{u}|source>)");
                         if let Ok(text) = get_page_text(u).await {
                             let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
+                            let head = text.chars().take(150).collect::<String>();
+                            send_message_to_channel("ik8", "ch_err", head).await;
 
                             match get_summary_truncated(&text).await {
                                 Ok(summary) => {
@@ -116,14 +118,16 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         system_prompt: Some(system),
     };
 
-    let question = format!(r#"From the provided text: {news_body}, identify the main news article and provide a concise summary of about 100 words on it. Present your response in the following JSON format:
+    let question = format!(
+        r#"From the provided text: {news_body}, identify the main news article and provide a concise summary of about 100 words on it. Present your response in the following JSON format:
     ```json
     {{
         "summary": "<summary>",
         "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"],
         "word_count": "<word_count>"
     }}
-    ```"#);
+    ```"#
+    );
     match openai.chat_completion(&chat_id, &question, &co).await {
         Ok(r) => {
             let text = r.choice;
