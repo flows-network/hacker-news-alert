@@ -19,7 +19,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("17 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("23 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
