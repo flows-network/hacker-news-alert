@@ -14,11 +14,13 @@ use std::env;
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use web_scraper_flows::get_page_text;
+use flowsnet_platform_sdk::logger;
 
 #[no_mangle]
 pub fn run() {
     dotenv().ok();
-    let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
+    logger::init();
+    let keyword = std::env::var("KEYWORD").unwrap_or("ChatGPT".to_string());
     schedule_cron_job(String::from("02 * * * *"), keyword, callback);
 }
 
