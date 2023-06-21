@@ -59,7 +59,7 @@ async fn callback(keyword: Vec<u8>) {
                                 }
                                 Err(_e) => {
                                     // Err(anyhow::Error::msg(_e.to_string()))
-                                    // send_message_to_channel("ik8", "ch_err", _e.to_string()).await
+                                    send_message_to_channel("ik8", "ch_err", _e.to_string()).await
                                 }
                             }
                         }
