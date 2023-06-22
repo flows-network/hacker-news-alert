@@ -1,17 +1,14 @@
 use anyhow;
-use chrono::{Duration, Utc};
 use dotenv::dotenv;
-use http_req::{request, request::Method, request::Request, uri::Uri};
+use http_req::request;
 use openai_flows::{
     chat::{ChatModel, ChatOptions},
     OpenAIFlows,
 };
 use schedule_flows::schedule_cron_job;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use slack_flows::{listen_to_channel, send_message_to_channel};
+use slack_flows::send_message_to_channel;
 use std::env;
-use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use web_scraper_flows::get_page_text;
 
@@ -19,7 +16,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("39 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("46 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -48,8 +45,7 @@ async fn callback(keyword: Vec<u8>) {
                     Some(u) => {
                         let source = format!("(<{u}|source>)");
                         if let Ok(text) = get_page_text(u).await {
-                            let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
-                            let head = text.chars().take(150).collect::<String>();
+                            // let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
                             if text.split_whitespace().count() < 100 {
                                 let msg = format!(
                                     "- *{title}*\n<{post} | post>{source} by {author}\n{text}"
@@ -67,18 +63,16 @@ async fn callback(keyword: Vec<u8>) {
                                 }
                                 Err(_e) => {
                                     // Err(anyhow::Error::msg(_e.to_string()))
-                                    send_message_to_channel("ik8", "ch_err", _e.to_string()).await
                                 }
                             }
                         }
                     }
                     None => {
                         if let Ok(text) = get_page_text(&post).await {
-                            let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
+                            // let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
                             if text.split_whitespace().count() < 100 {
-                                let msg = format!(
-                                    "- *{title}*\n<{post} | post> by {author}\n{text}"
-                                );
+                                let msg =
+                                    format!("- *{title}*\n<{post} | post> by {author}\n{text}");
                                 send_message_to_channel(&workspace, &channel, msg).await;
 
                                 continue;
@@ -135,13 +129,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
     let question = format!("summarize this within 100 words: {news_body}");
 
     match openai.chat_completion(&chat_id, &question, &co).await {
-        Ok(r) => {
-            let text = r.choice;
-            let head = text.chars().take(150).collect::<String>();
-            send_message_to_channel("ik8", "ch_err", head).await;
-
-            Ok(text)
-        }
+        Ok(r) => Ok(r.choice),
         Err(_e) => Err(anyhow::Error::msg(_e.to_string())),
     }
 }
