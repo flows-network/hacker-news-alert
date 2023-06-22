@@ -22,9 +22,6 @@ pub fn run() {
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
 async fn callback(keyword: Vec<u8>) {
-    let workspace = env::var("slack_workspace").unwrap_or("secondstate".to_string());
-    let channel = env::var("slack_channel").unwrap_or("github-status".to_string());
-
     let query = String::from_utf8_lossy(&keyword);
     let now = SystemTime::now();
     let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 30000;
@@ -34,47 +31,7 @@ async fn callback(keyword: Vec<u8>) {
     if let Ok(_) = request::get(url, &mut writer) {
         if let Ok(search) = serde_json::from_slice::<Search>(&writer) {
             for hit in search.hits {
-                let title = &hit.title;
-                let url = &hit.url;
-                let object_id = &hit.object_id;
-                let author = &hit.author;
-                let post = format!("https://news.ycombinator.com/item?id={object_id}");
-                let mut text = "".to_string();
-                let mut summary = "".to_string();
-                let mut source = "".to_string();
-
-                match url {
-                    Some(u) => {
-                        source = format!("(<{u}|source>)");
-                        if let Ok(_text) = get_page_text(u).await {
-                            if _text.split_whitespace().count() < 100 {
-                                summary = _text.clone();
-                            }
-                            text = _text;
-                        }
-                        let out = format!("arm with source, summary: {summary}, text: {text}");
-                        send_message_to_channel("ik8", "ch_err", out).await;
-                    }
-                    None => {
-                        if let Ok(_text) = get_page_text(&post).await {
-                            if _text.split_whitespace().count() < 100 {
-                                summary = _text.clone();
-                            }
-                            text = _text;
-                        }
-                        let out = format!("arm no source, summary: {summary}, text: {text}");
-                        send_message_to_channel("ik8", "ch_out", out).await;
-                    }
-                };
-                if summary.is_empty() {
-                    if let Ok(_summary) = get_summary_truncated(&text).await {
-                        summary = _summary;
-                    }
-                }
-
-                let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
-
-                send_message_to_channel(&workspace, &channel, msg).await;
+                send_message_wrapper(hit).await;
             }
         }
     }
@@ -121,4 +78,48 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         Ok(r) => Ok(r.choice),
         Err(_e) => Err(anyhow::Error::msg(_e.to_string())),
     }
+}
+
+pub async fn send_message_wrapper(hit: Hit) -> anyhow::Result<()> {
+    let workspace = env::var("slack_workspace").unwrap_or("secondstate".to_string());
+    let channel = env::var("slack_channel").unwrap_or("github-status".to_string());
+
+    let title = &hit.title;
+    let url = &hit.url;
+    let object_id = &hit.object_id;
+    let author = &hit.author;
+    let post = format!("https://news.ycombinator.com/item?id={object_id}");
+    let mut _text = "".to_string();
+    let mut source = "".to_string();
+
+    match url {
+        Some(u) => {
+            source = format!("(<{u}|source>)");
+            _text = get_page_text(u)
+                .await
+                .unwrap_or("failed to scrape text with hit url".to_string());
+
+            // let out = format!("arm with source, summary: {summary}, text: {text}");
+            // send_message_to_channel("ik8", "ch_err", out).await;
+        }
+        None => {
+            _text = get_page_text(&post)
+                .await
+                .unwrap_or("failed to scrape text with post url".to_string());
+
+            // let out = format!("arm no source, summary: {summary}, text: {text}");
+            // send_message_to_channel("ik8", "ch_out", out).await;
+        }
+    };
+    
+    let summary = if _text.split_whitespace().count() > 100 {
+        get_summary_truncated(&_text).await?
+    } else {
+        _text
+    };
+
+    let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
+
+    send_message_to_channel(&workspace, &channel, msg).await;
+    Ok(())
 }
