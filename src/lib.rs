@@ -51,11 +51,18 @@ async fn callback(keyword: Vec<u8>) {
                             let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
                             let head = text.chars().take(150).collect::<String>();
                             send_message_to_channel("ik8", "ch_err", head).await;
+                            if text.split_whitespace().count() < 100 {
+                                let msg = format!(
+                                    "- *{title}*\n<{post} | post>{source} by {author}\n{text}"
+                                );
+                                send_message_to_channel(&workspace, &channel, msg).await;
 
+                                continue;
+                            }
                             match get_summary_truncated(&text).await {
                                 Ok(summary) => {
                                     let msg = format!(
-                                        "- *{title}*\n<{post} | post>{source} by {author}\n{text}"
+                                        "- *{title}*\n<{post} | post>{source} by {author}\n{summary}"
                                     );
                                     send_message_to_channel(&workspace, &channel, msg).await;
                                 }
@@ -69,6 +76,14 @@ async fn callback(keyword: Vec<u8>) {
                     None => {
                         if let Ok(text) = get_page_text(&post).await {
                             let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
+                            if text.split_whitespace().count() < 100 {
+                                let msg = format!(
+                                    "- *{title}*\n<{post} | post> by {author}\n{text}"
+                                );
+                                send_message_to_channel(&workspace, &channel, msg).await;
+
+                                continue;
+                            }
 
                             if let Ok(summary) = get_summary_truncated(&text).await {
                                 let msg =
@@ -105,12 +120,12 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
 
     let news_body = inp
         .split_ascii_whitespace()
-        .take(11000)
+        .take(10000)
         .collect::<Vec<&str>>()
         .join(" ");
 
     let chat_id = format!("summary#99");
-    let system = &format!("You're a news editor AI.");
+    let system = &format!("You're an AI assistant.");
 
     let co = ChatOptions {
         model: ChatModel::GPT35Turbo16K,
@@ -118,47 +133,16 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         system_prompt: Some(system),
     };
 
-    let question = format!(
-        r#"From the provided text: {news_body}, identify the main news article and provide a concise summary of about 100 words on it. Present your response in the following JSON format:
-    ```json
-    {{
-        "summary": "<summary>",
-        "keywords": ["<keyword1>", "<keyword2>", "<keyword3>"],
-        "word_count": "<word_count>"
-    }}
-    ```"#
-    );
+    let question = format!("summarize this within 100 words: {news_body}");
+
     match openai.chat_completion(&chat_id, &question, &co).await {
         Ok(r) => {
             let text = r.choice;
             let head = text.chars().take(150).collect::<String>();
             send_message_to_channel("ik8", "ch_err", head).await;
 
-            let start_index = text.find('{').unwrap();
-            let end_index = text.rfind('}').unwrap();
-            let json_string = &text[start_index..=end_index];
-
-            let article: Article = serde_json::from_str(json_string).unwrap_or(Article::default());
-
-            Ok(article.summary)
+            Ok(text)
         }
         Err(_e) => Err(anyhow::Error::msg(_e.to_string())),
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Article {
-    summary: String,
-    keywords: Vec<String>,
-    word_count: i32,
-}
-
-impl Default for Article {
-    fn default() -> Self {
-        Self {
-            summary: "failed to parse gpt returned summary".to_string(),
-            keywords: Vec::new(),
-            word_count: 0,
-        }
     }
 }
