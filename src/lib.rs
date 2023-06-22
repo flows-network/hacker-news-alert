@@ -16,7 +16,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("06 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("16 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -39,44 +39,38 @@ async fn callback(keyword: Vec<u8>) {
                 let object_id = &hit.object_id;
                 let author = &hit.author;
                 let post = format!("https://news.ycombinator.com/item?id={object_id}");
+                let mut text = "".to_string();
                 let mut summary = "".to_string();
-                let mut msg = "".to_string();
+                let mut source = "".to_string();
 
                 match url {
                     Some(u) => {
-                        let source = format!("(<{u}|source>)");
-                        if let Ok(text) = get_page_text(u).await {
-                            if text.split_whitespace().count() < 100 {
-                                summary = text;
+                        source = format!("(<{u}|source>)");
+                        if let Ok(_text) = get_page_text(u).await {
+                            if _text.split_whitespace().count() < 100 {
+                                summary = _text;
                             } else {
-                                match get_summary_truncated(&text).await {
-                                    Ok(_summary) => summary = _summary,
-                                    Err(_e) => {
-                                        // Err(anyhow::Error::msg(_e.to_string()))
-                                    }
-                                }
+                                text = _text;
                             }
-                            msg = format!(
-                                "- *{title}*\n<{post} | post>{source} by {author}\n{summary}"
-                            );
                         }
                     }
                     None => {
-                        if let Ok(text) = get_page_text(&post).await {
-                            if text.split_whitespace().count() < 100 {
-                                summary = text;
+                        if let Ok(_text) = get_page_text(&post).await {
+                            if _text.split_whitespace().count() < 100 {
+                                summary = _text;
                             } else {
-                                if let Ok(_summary) = get_summary_truncated(&text).await {
-                                    summary = _summary;
-                                }
+                                text = _text;
                             }
-
-                            msg = format!("- *{title}*\n<{post} | post> by {author}\n{summary}");
                         }
                     }
                 };
 
-                send_message_to_channel(&workspace, &channel, msg).await;
+                if let Ok(_summary) = get_summary_truncated(&text).await {
+                    let msg =
+                        format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
+
+                    send_message_to_channel(&workspace, &channel, msg).await;
+                }
             }
         }
     }
