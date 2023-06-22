@@ -18,5 +18,4 @@ serde_json = "1.0.94"
 slack-flows = "0.3.1"
 tokio_wasi = { version = "1.25.1", features = ["macros", "rt", "sync"] }
 web-scraper-flows = "0.1.0"
-chrono = "0.4.26"
 anyhow = "1.0.71"

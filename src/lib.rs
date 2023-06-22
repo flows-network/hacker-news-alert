@@ -16,7 +16,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("46 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("06 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -38,54 +38,45 @@ async fn callback(keyword: Vec<u8>) {
                 let url = &hit.url;
                 let object_id = &hit.object_id;
                 let author = &hit.author;
-
                 let post = format!("https://news.ycombinator.com/item?id={object_id}");
+                let mut summary = "".to_string();
+                let mut msg = "".to_string();
 
                 match url {
                     Some(u) => {
                         let source = format!("(<{u}|source>)");
                         if let Ok(text) = get_page_text(u).await {
-                            // let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
                             if text.split_whitespace().count() < 100 {
-                                let msg = format!(
-                                    "- *{title}*\n<{post} | post>{source} by {author}\n{text}"
-                                );
-                                send_message_to_channel(&workspace, &channel, msg).await;
-
-                                continue;
-                            }
-                            match get_summary_truncated(&text).await {
-                                Ok(summary) => {
-                                    let msg = format!(
-                                        "- *{title}*\n<{post} | post>{source} by {author}\n{summary}"
-                                    );
-                                    send_message_to_channel(&workspace, &channel, msg).await;
-                                }
-                                Err(_e) => {
-                                    // Err(anyhow::Error::msg(_e.to_string()))
+                                summary = text;
+                            } else {
+                                match get_summary_truncated(&text).await {
+                                    Ok(_summary) => summary = _summary,
+                                    Err(_e) => {
+                                        // Err(anyhow::Error::msg(_e.to_string()))
+                                    }
                                 }
                             }
+                            msg = format!(
+                                "- *{title}*\n<{post} | post>{source} by {author}\n{summary}"
+                            );
                         }
                     }
                     None => {
                         if let Ok(text) = get_page_text(&post).await {
-                            // let text = text.split_whitespace().collect::<Vec<&str>>().join(" ");
                             if text.split_whitespace().count() < 100 {
-                                let msg =
-                                    format!("- *{title}*\n<{post} | post> by {author}\n{text}");
-                                send_message_to_channel(&workspace, &channel, msg).await;
-
-                                continue;
+                                summary = text;
+                            } else {
+                                if let Ok(_summary) = get_summary_truncated(&text).await {
+                                    summary = _summary;
+                                }
                             }
 
-                            if let Ok(summary) = get_summary_truncated(&text).await {
-                                let msg =
-                                    format!("- *{title}*\n<{post} | post> by {author}\n{summary}");
-                                send_message_to_channel(&workspace, &channel, msg).await;
-                            }
+                            msg = format!("- *{title}*\n<{post} | post> by {author}\n{summary}");
                         }
                     }
                 };
+
+                send_message_to_channel(&workspace, &channel, msg).await;
             }
         }
     }
