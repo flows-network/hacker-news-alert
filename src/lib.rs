@@ -6,17 +6,17 @@ use openai_flows::{
     OpenAIFlows,
 };
 use schedule_flows::schedule_cron_job;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use slack_flows::send_message_to_channel;
+use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env, fmt::format};
 use web_scraper_flows::get_page_text;
 
 #[no_mangle]
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("57 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("14 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -24,25 +24,25 @@ pub fn run() {
 async fn callback(keyword: Vec<u8>) {
     let query = String::from_utf8_lossy(&keyword);
     let now = SystemTime::now();
-    let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 30000;
+    let dura = now.duration_since(UNIX_EPOCH).unwrap().as_secs() - 3600;
     let url = format!("https://hn.algolia.com/api/v1/search_by_date?tags=story&query={query}&numericFilters=created_at_i>{dura}");
 
     let mut writer = Vec::new();
     if let Ok(_) = request::get(url, &mut writer) {
         if let Ok(search) = serde_json::from_slice::<Search>(&writer) {
             for hit in search.hits {
-                send_message_wrapper(hit).await;
+                let _ = send_message_wrapper(hit).await;
             }
         }
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Search {
     pub hits: Vec<Hit>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Hit {
     pub title: String,
@@ -58,7 +58,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
     openai.set_retry_times(3);
 
     let news_body = inp
-        .split_ascii_whitespace()
+        .split_whitespace()
         .take(10000)
         .collect::<Vec<&str>>()
         .join(" ");
@@ -85,33 +85,24 @@ pub async fn send_message_wrapper(hit: Hit) -> anyhow::Result<()> {
     let channel = env::var("slack_channel").unwrap_or("github-status".to_string());
 
     let title = &hit.title;
-    let url = &hit.url;
-    let object_id = &hit.object_id;
     let author = &hit.author;
-    let post = format!("https://news.ycombinator.com/item?id={object_id}");
-    let mut _text = "".to_string();
+    let post = format!("https://news.ycombinator.com/item?id={}", &hit.object_id);
     let mut source = "".to_string();
 
-    match url {
+    let _text = match &hit.url {
         Some(u) => {
             source = format!("(<{u}|source>)");
-            _text = get_page_text(u)
+            get_page_text(u)
                 .await
-                .unwrap_or("failed to scrape text with hit url".to_string());
-
-            // let out = format!("arm with source, summary: {summary}, text: {text}");
-            // send_message_to_channel("ik8", "ch_err", out).await;
+                .unwrap_or("failed to scrape text with hit url".to_string())
         }
         None => {
-            _text = get_page_text(&post)
+            get_page_text(&post)
                 .await
-                .unwrap_or("failed to scrape text with post url".to_string());
-
-            // let out = format!("arm no source, summary: {summary}, text: {text}");
-            // send_message_to_channel("ik8", "ch_out", out).await;
+                .unwrap_or("failed to scrape text with post url".to_string())
         }
     };
-    
+
     let summary = if _text.split_whitespace().count() > 100 {
         get_summary_truncated(&_text).await?
     } else {
