@@ -8,15 +8,15 @@ use openai_flows::{
 use schedule_flows::schedule_cron_job;
 use serde::{Deserialize, Serialize};
 use slack_flows::send_message_to_channel;
-use std::{env, fmt::format};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{env, fmt::format};
 use web_scraper_flows::get_page_text;
 
 #[no_mangle]
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("50 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("57 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -48,10 +48,9 @@ async fn callback(keyword: Vec<u8>) {
                         source = format!("(<{u}|source>)");
                         if let Ok(_text) = get_page_text(u).await {
                             if _text.split_whitespace().count() < 100 {
-                                summary = _text;
-                            } else {
-                                text = _text;
+                                summary = _text.clone();
                             }
+                            text = _text;
                         }
                         let out = format!("arm with source, summary: {summary}, text: {text}");
                         send_message_to_channel("ik8", "ch_err", out).await;
@@ -59,14 +58,12 @@ async fn callback(keyword: Vec<u8>) {
                     None => {
                         if let Ok(_text) = get_page_text(&post).await {
                             if _text.split_whitespace().count() < 100 {
-                                summary = _text;
-                            } else {
-                                text = _text;
+                                summary = _text.clone();
                             }
+                            text = _text;
                         }
                         let out = format!("arm no source, summary: {summary}, text: {text}");
                         send_message_to_channel("ik8", "ch_out", out).await;
-
                     }
                 };
                 if summary.is_empty() {
