@@ -16,7 +16,7 @@ use web_scraper_flows::get_page_text;
 pub fn run() {
     dotenv().ok();
     let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
-    schedule_cron_job(String::from("16 * * * *"), keyword, callback);
+    schedule_cron_job(String::from("21 * * * *"), keyword, callback);
 }
 
 #[no_mangle]
@@ -64,13 +64,15 @@ async fn callback(keyword: Vec<u8>) {
                         }
                     }
                 };
-
-                if let Ok(_summary) = get_summary_truncated(&text).await {
-                    let msg =
-                        format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
-
-                    send_message_to_channel(&workspace, &channel, msg).await;
+                if summary.is_empty() {
+                    if let Ok(_summary) = get_summary_truncated(&text).await {
+                        summary = _summary;
+                    }
                 }
+
+                let msg = format!("- *{title}*\n<{post} | post>{source} by {author}\n{summary}");
+
+                send_message_to_channel(&workspace, &channel, msg).await;
             }
         }
     }
