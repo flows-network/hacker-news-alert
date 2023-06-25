@@ -15,7 +15,7 @@ use web_scraper_flows::get_page_text;
 #[no_mangle]
 pub fn run() {
     dotenv().ok();
-    let keyword = std::env::var("KEYWORD").unwrap_or("chatGPT".to_string());
+    let keyword = std::env::var("KEYWORD").unwrap_or("ChatGPT".to_string());
     schedule_cron_job(String::from("14 * * * *"), keyword, callback);
 }
 
@@ -82,7 +82,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
 
 pub async fn send_message_wrapper(hit: Hit) -> anyhow::Result<()> {
     let workspace = env::var("slack_workspace").unwrap_or("secondstate".to_string());
-    let channel = env::var("slack_channel").unwrap_or("github-status".to_string());
+    let channel = env::var("slack_channel").unwrap_or("test-flow".to_string());
 
     let title = &hit.title;
     let author = &hit.author;
