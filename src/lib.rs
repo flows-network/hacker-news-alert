@@ -72,7 +72,7 @@ async fn get_summary_truncated(inp: &str) -> anyhow::Result<String> {
         system_prompt: Some(system),
     };
 
-    let question = format!("summarize this within 100 words: {news_body}");
+    let question = format!("请用中文进行总结，字数最好在100个字内: {news_body}");
 
     match openai.chat_completion(&chat_id, &question, &co).await {
         Ok(r) => Ok(r.choice),
